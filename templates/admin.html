@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — Moohan Events</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 16px; }
+    textarea { width: 100%; min-height: 260px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .error { color: #b91c1c; }
+    .hint { color: #475569; }
+    button { padding: 10px 14px; border-radius: 10px; border: 0; background: #0ea5e9; color: #fff; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Admin — Update Events</h1>
+  {% if error %}<p class="error">Error: {{ error }}</p>{% endif %}
+  <p class="hint">Paste a JSON array of events with keys: <code>key</code>, <code>name</code>, <code>iso_utc</code>.</p>
+  <form method="POST">
+    <input type="hidden" name="token" value="{{ token }}">
+    <textarea name="events_json">{{ events | tojson(indent=2) }}</textarea>
+    <p><button type="submit">Save</button></p>
+  </form>
+</body>
+</html>

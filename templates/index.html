@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project Moohan Launch</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta property="og:title" content="Project Moohan Launch">
+  <meta property="og:description" content="Live countdown, gallery, teaser audio, and curated Moohan news.">
+  <meta property="og:image" content="{{ url_for('static', filename='img/headset1.jpg') }}">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>Project Moohan</h1>
+      <p class="tagline">A new chapter in XR</p>
+      <div class="hero-ctas">
+        <a href="#countdown" class="cta">Track the Reveal</a>
+        <button id="themeToggle" class="ghost">Toggle Theme</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="countdown" class="card">
+      <div class="row space-between">
+        <h2>Countdown</h2>
+        <div class="controls">
+          <label for="tz">Timezone:</label>
+          <select id="tz">
+            <option value="auto" selected>Auto (Your Zone)</option>
+            <option value="Asia/Seoul">Seoul (KST)</option>
+            <option value="UTC">UTC</option>
+          </select>
+          <label for="eventPick">Event:</label>
+          <select id="eventPick"></select>
+        </div>
+      </div>
+      <p class="sub">Dates below are placeholders/rumors until official confirmation.</p>
+      <div class="timer" role="timer" aria-live="polite">
+        <div class="clock"><span id="d">--</span><label>Days</label></div>
+        <div class="clock"><span id="h">--</span><label>Hours</label></div>
+        <div class="clock"><span id="m">--</span><label>Minutes</label></div>
+        <div class="clock"><span id="s">--</span><label>Seconds</label></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress" id="progress"></div>
+      </div>
+      <div id="when" class="sub small"></div>
+    </section>
+
+    <section id="gallery" class="card">
+      <h2>First Look</h2>
+      <div class="grid">
+        <figure><img src="{{ url_for('static', filename='img/headset1.jpg') }}" alt="Moohan headset render 1"><figcaption>Concept render</figcaption></figure>
+        <figure><img src="{{ url_for('static', filename='img/headset2.jpg') }}" alt="Moohan headset on stand"><figcaption>Prototype on stand</figcaption></figure>
+        <figure><img src="{{ url_for('static', filename='img/headset3.jpg') }}" alt="Moohan headset render 2"><figcaption>Alternate colorway</figcaption></figure>
+        <figure><img src="{{ url_for('static', filename='img/stage.jpg') }}" alt="Project Moohan stage slide"><figcaption>Stage reveal slide</figcaption></figure>
+      </div>
+      <div class="audio-bar">
+        <audio id="teaser" controls preload="metadata">
+          <source src="{{ url_for('static', filename='audio/teaser.mp3') }}" type="audio/mpeg">
+        </audio>
+        <button id="bgToggle" class="ghost">Play/Pause Teaser</button>
+      </div>
+    </section>
+
+    <section id="news" class="card">
+      <h2>Latest Moohan News</h2>
+      <p class="sub">Curated from trusted outlets; refresh for updates.</p>
+      <div id="newsList" class="news-list"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 Fan launch page. Not affiliated with Samsung.</p>
+  </footer>
+
+  <script>
+    // ---- Theme Toggle ----
+    const themeToggle = document.getElementById('themeToggle');
+    const root = document.documentElement;
+    const THEME_KEY = 'moohan-theme';
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    themeToggle.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(THEME_KEY, next);
+    });
+
+    // ---- Events & Timezones ----
+    const EVENTS = {{ events | tojson }};
+    const eventPick = document.getElementById('eventPick');
+    const tzSel = document.getElementById('tz');
+    const whenEl = document.getElementById('when');
+    const dEl = document.getElementById('d'), hEl = document.getElementById('h'), mEl = document.getElementById('m'), sEl = document.getElementById('s');
+    const progressEl = document.getElementById('progress');
+
+    EVENTS.forEach((e, idx) => {
+      const opt = document.createElement('option');
+      opt.value = e.key;
+      opt.textContent = e.name;
+      if (e.key === 'reveal') opt.selected = true;
+      eventPick.appendChild(opt);
+    });
+
+    function fmtInTZ(iso, tz) {
+      try {
+        const d = new Date(iso);
+        const fmt = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'long', timeZone: tz });
+        return fmt.format(d);
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function currentTZ() {
+      const val = tzSel.value;
+      if (val === 'auto') return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      return val;
+    }
+
+    function activeEvent() {
+      const key = eventPick.value;
+      return EVENTS.find(e => e.key === key) || EVENTS[0];
+    }
+
+    function updateWhenText() {
+      const ev = activeEvent();
+      const tz = currentTZ();
+      const localStr = fmtInTZ(ev.iso_utc, tz);
+      const seoulStr = fmtInTZ(ev.iso_utc, 'Asia/Seoul');
+      whenEl.textContent = `Your time: ${localStr} • Seoul (KST): ${seoulStr}`;
+    }
+
+    function progressToReveal() {
+      const reveal = EVENTS.find(e => e.key === 'reveal');
+      if (!reveal) return 0;
+      const start = new Date().getTime();
+      const end = new Date(reveal.iso_utc).getTime();
+      const total = Math.max(end - (Date.now() - 30*24*3600*1000), 1); // last 30 days window
+      const done = Math.min(Math.max(end - start, 0), total);
+      const pct = 100 - (done / total * 100);
+      return Math.max(0, Math.min(100, pct));
+    }
+
+    function tick() {
+      const ev = activeEvent();
+      const target = new Date(ev.iso_utc).getTime();
+      const now = Date.now();
+      let diff = target - now;
+      if (diff <= 0) {
+        dEl.textContent = '0'; hEl.textContent = '00'; mEl.textContent = '00'; sEl.textContent = '00';
+        progressEl.style.width = '100%';
+        return;
+      }
+      const sec = Math.floor(diff / 1000);
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      dEl.textContent = String(d);
+      hEl.textContent = String(h).padStart(2,'0');
+      mEl.textContent = String(m).padStart(2,'0');
+      sEl.textContent = String(s).padStart(2,'0');
+      progressEl.style.width = progressToReveal() + '%';
+    }
+
+    tzSel.addEventListener('change', updateWhenText);
+    eventPick.addEventListener('change', () => { updateWhenText(); tick(); });
+
+    updateWhenText();
+    tick();
+    setInterval(tick, 1000);
+
+    // ---- Audio quick toggle ----
+    const audio = document.getElementById('teaser');
+    document.getElementById('bgToggle').addEventListener('click', () => {
+      if (audio.paused) audio.play().catch(()=>{}); else audio.pause();
+    });
+
+    // ---- News feed ----
+    async function loadNews() {
+      const list = document.getElementById('newsList');
+      list.innerHTML = '<div class="news-skel">Loading headlines…</div>';
+      try {
+        const res = await fetch('/api/news');
+        const data = await res.json();
+        list.innerHTML = '';
+        (data.items || []).forEach(item => {
+          const a = document.createElement('a');
+          a.className = 'news-item';
+          a.href = item.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.innerHTML = `
+            <div class="news-text">
+              <div class="news-title">${item.title || 'Untitled'}</div>
+              <div class="news-meta">${item.source || ''}${item.published ? ' • ' + item.published : ''}</div>
+              <div class="news-desc">${item.summary || ''}</div>
+            </div>
+          `;
+          list.appendChild(a);
+        });
+        if (!list.children.length) list.innerHTML = '<div class="news-skel">No headlines available right now.</div>';
+      } catch (e) {
+        list.innerHTML = '<div class="news-skel">Could not load news.</div>';
+      }
+    }
+    loadNews();
+  </script>
+</body>
+</html>
