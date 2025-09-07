@@ -12,5 +12,3 @@ services:
       - key: ADMIN_TOKEN
         sync: false
     healthCheckPath: /health
-    regions:
-      - ohio
